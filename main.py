@@ -28,6 +28,6 @@ app = falcon.API()
 app.add_route('/train', TrainRequest())
 
 
-for key in s3client().list_objects(Bucket=os.getenv('AWS_BUCKET', "NOBUCKET"), Prefix="ml/" Delimiter='/').get('CommonPrefixes', []):
+for key in s3client().list_objects(Bucket=os.getenv('AWS_BUCKET', "NOBUCKET"), Prefix="ml/", Delimiter='/').get('CommonPrefixes', []):
     folder_name = key['Prefix'][:-1]
     print(folder_name)
