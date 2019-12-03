@@ -1,13 +1,14 @@
 # Let's get this party started!
 import falcon
 import boto3
+import os
 
 def s3client():
     return boto3.client(
         's3',
-        aws_access_key_id="AKIAXTALDU7HK57Y3TEN",
-        aws_secret_access_key="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",
-        region_name="eu-west-1"
+        aws_access_key_id=os.getenv('AWS_ACCESS_KEY', "NOKEY"),
+        aws_secret_access_key=os.getenv('AWS_SECRET_KEY', "NOSECRET"),
+        region_name=os.getenv('AWS_REGION', "NOREGION")
     )
 
 class TrainRequest(object):
@@ -27,6 +28,6 @@ app = falcon.API()
 app.add_route('/train', TrainRequest())
 
 
-for key in s3client().list_objects(Bucket='quana-prod', Delimiter='/').get('CommonPrefixes', []):
+for key in s3client().list_objects(Bucket=os.getenv('AWS_BUCKET', "NOBUCKET"), Prefix="ml/" Delimiter='/').get('CommonPrefixes', []):
     folder_name = key['Prefix'][:-1]
     print(folder_name)
