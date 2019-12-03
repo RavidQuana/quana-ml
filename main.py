@@ -2,6 +2,10 @@
 import falcon
 import boto3
 import os
+import ml
+
+from dotenv import load_dotenv
+load_dotenv()
 
 def s3client():
     return boto3.client(
@@ -27,7 +31,8 @@ app = falcon.API()
 # things will handle all requests to the '/things' URL path
 app.add_route('/train', TrainRequest())
 
+main_folder = "ml/"
 
-for key in s3client().list_objects(Bucket=os.getenv('AWS_BUCKET', "NOBUCKET"), Prefix="ml/", Delimiter='/').get('CommonPrefixes', []):
-    folder_name = key['Prefix'][:-1]
+for key in s3client().list_objects(Bucket=os.getenv('AWS_BUCKET', "NOBUCKET"), Prefix=main_folder, Delimiter='/').get('CommonPrefixes', []):
+    folder_name = key['Prefix'][len(main_folder):-1]
     print(folder_name)

@@ -313,7 +313,7 @@ def mainLag():
     plt.show(block=True)
 
 
-def main():
+def mainSmooth():
     files = glob.glob(os.path.join('data', "*.csv"))
     files.sort()
 
@@ -363,7 +363,21 @@ def mainCombined():
     plt.title('Pesticide Smooth 2 Lag [1,2]')
     plt.show(block=True)
 
+# import urllib.request
+# import zipfile
 
+def train(zip_file):
+    dfs = []
+    with zipfile.ZipFile(zip_file, "r") as f:
+        for name in f.namelist():
+            df = pd.read_csv(f.open(name))
+            df._path = name
+            dfs.append(dfs)
+    print(dfs)
 
+# train(open('./samples.zip', 'r'))
+# train(urllib.request.urlopen('http://samples.zip'))
 
-main()
+# import requests, zipfile, io
+# r = requests.get(zip_file_url)
+# z = zipfile.ZipFile(io.BytesIO(r.content))
