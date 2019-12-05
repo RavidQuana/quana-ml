@@ -1,4 +1,8 @@
 # %load main.py
+import urllib
+import zipfile
+import urllib.request
+
 import pandas as pd
 import numpy as np
 from sklearn.model_selection import train_test_split
@@ -150,6 +154,40 @@ def check_for_mold(path):
 
 def load_df(df, laggings, smoothing):
     return preprocess(df, laggings, smoothing)
+
+def export(dfs, lagging, smoothing, algo, algo_rand):
+    # load all filees
+    print("Preprocessing...")
+
+    with ThreadPoolExecutor(max_workers=12) as executor:
+        dfs = executor.map(lambda x: load_df(x.copy(deep=True), lagging, smoothing), dfs)
+
+    df_cards = {}
+    agents = {}
+    # split by card
+    for member in dfs:
+        card = member._card
+        if card in df_cards:
+            df_cards[card].append(member)
+        else:
+            df_cards[card] = [member]
+
+
+        for key, value in df_cards.items():
+            # we get all input data
+            x_train = train.iloc[:, 0:value[0]._tags_index].values
+            # we get tags data
+            y_train = train.iloc[:, value[0]._tags_index:].values
+
+            #regressor = RandomForestClassifier(n_estimators=100, random_state=0, criterion="entropy")
+            # using cart
+            regressor = DecisionTreeRegressor(random_state=algo_rand)
+            agents[key] = regressor
+
+            # train
+            regressor.fit(x_train, y_train)
+
+    return agents
 
 
 def run(dfs, lagging, smoothing, algo, target, file_rands, algo_rands):
@@ -363,8 +401,16 @@ def mainCombined():
     plt.title('Pesticide Smooth 2 Lag [1,2]')
     plt.show(block=True)
 
-# import urllib.request
-# import zipfile
+
+def download_zip(url):
+    zip = urllib.request.urlopen('http://samples.zip')
+    dfs = []
+    with zipfile.ZipFile(zip, "r") as f:
+        for name in f.namelist():
+            df = pd.read_csv(f.open(name))
+            df._path = name
+            dfs.append(dfs)
+    print(dfs)
 
 def train(zip_file):
     dfs = []
