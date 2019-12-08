@@ -21,6 +21,7 @@ from io import StringIO
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.preprocessing import MultiLabelBinarizer
 from concurrent.futures import ThreadPoolExecutor
+import pickle
 
 def time_to_state(time):
     if time < 15:
@@ -401,7 +402,17 @@ def mainCombined():
     plt.show(block=True)
 
 
+def open_zip_agent(file):
+    agent = {}
+    try:
+        with zipfile.ZipFile(file, "r") as f:
+            for name in f.namelist():
+                agent[name] = pickle.load(f.open(name))
+    except Exception as e:
+        print("Open zip error", e)
+        return None
 
+    return agent   
 
 def open_zip(file_path):
     dfs = []
@@ -417,6 +428,27 @@ def open_zip(file_path):
 
     return dfs   
 
+def classify(agent, file):
+    df = pd.read_csv(file)
+    df._path = "Sample"
+    df = load_df(df, [], 0)
+
+    if str(df._card) not in agent:
+        return None
+
+    agent = agent[str(df._card)]     
+    result = {}
+
+    x_test = df.iloc[:, 0:df._tags_index].values
+    y_test = df.iloc[:, 0:df._tags_index].values
+    
+    for target in tags_order:
+        for index, tag in enumerate(tags_order):
+            if tag != target:
+                y_test[:, index] = 0
+                y_pred[:, index] = 0
+
+    print(df)
 
 # train(open('./samples.zip', 'r'))
 # train(urllib.request.urlopen('http://samples.zip'))

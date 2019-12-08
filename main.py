@@ -18,8 +18,6 @@ load_dotenv()
 from falcon_multipart.middleware import MultipartMiddleware
 
 
-main_version = None
-main_agent = None
 main_folder = "ml"
 
 def train_process(id, url):
@@ -56,10 +54,6 @@ def train_process(id, url):
     #remove tmp file agents
     try_remove(path)
 
-    global main_version
-    if main_version == None:
-        main_version = id
-
 
 def try_remove(file_path):
     try: 
@@ -79,8 +73,28 @@ def s3client():
     )
 
 
+agents = {}
+def get_agent(agent_id):
+    agent = {}
+    try:
+        s3_response_object = s3client().get_object(Bucket=os.getenv('AWS_BUCKET', "NOBUCKET"), Key=main_folder + "/" + agent_id + "/agents.zip")
+        #object_content = s3_response_object['Body'].read()
+        agent = ml.open_zip_agent(io.BytesIO(s3_response_object['Body'].read()))
+        return agent  
+    except Exception as e:
+        print("Error getting agent", agent_id, e)
+        return None    
+          
+        
+
 def classify(agent_id, file):
-    return {}
+    agent = get_agent(agent_id)
+    print(agent)
+
+    if agent == None:
+        return None
+        
+    return ml.classify(agent, file)
 
 
 class TrainRequest(object):
@@ -107,15 +121,16 @@ class ClassifyRequest(object):
     def on_post(self, req, resp):
         # Retrieve input_file
         input_file = req.get_param('sample')
+        version = req.get_param('version')
 
         # Test if the file was uploaded
-        if input_file == None:
+        if input_file == None or version == None:
             resp.status = falcon.HTTP_400 
             resp.body = ('{}')
             return
 
-        print(input_file.filename)
-        classify()
+        print(input_file.filename, version)
+        classify(version, input_file.file)
         resp.status = falcon.HTTP_200  
         resp.body = (json.dumps({}))
 
@@ -175,5 +190,4 @@ app = falcon.API(middleware=[MultipartMiddleware()])
 # things will handle all requests to the '/things' URL path
 app.add_route('/train', TrainRequest())
 app.add_route('/classify', ClassifyRequest())
-update_versions()    
-print("Main version:", main_version)
+
