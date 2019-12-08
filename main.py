@@ -56,6 +56,9 @@ def train_process(id, url):
     #remove tmp file agents
     try_remove(path)
 
+    global main_version
+    if main_version == None:
+        main_version = id
 
 
 def try_remove(file_path):
@@ -153,9 +156,9 @@ def update_versions():
         folder_name = key['Prefix'][len(main_folder)+1:-1]
         versions.append(folder_name)
     main_version = max(versions)
-    
+
     try:
-        req = requests.get(os.getenv('MAIN_SERVER_URL', "http://localhost:3000/ml/version"), headers={'x-api-key': 'Test'})
+        req = requests.get(os.getenv('MAIN_SERVER_URL', "http://localhost:3000") + "/ml/version", headers={'x-api-key': 'Test'})
         result = req.json()
         version = result["version"]
         if version != None and version in versions:
@@ -172,6 +175,5 @@ app = falcon.API(middleware=[MultipartMiddleware()])
 # things will handle all requests to the '/things' URL path
 app.add_route('/train', TrainRequest())
 app.add_route('/classify', ClassifyRequest())
-
 update_versions()    
 print("Main version:", main_version)
