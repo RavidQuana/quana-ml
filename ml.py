@@ -1,7 +1,5 @@
 # %load main.py
-import urllib
 import zipfile
-import urllib.request
 
 import pandas as pd
 import numpy as np
@@ -171,21 +169,22 @@ def export(dfs, lagging, smoothing, algo, algo_rand):
             df_cards[card].append(member)
         else:
             df_cards[card] = [member]
+        
+    for key, value in df_cards.items():
+        train = pd.concat(value, sort=False)
 
+        # we get all input data
+        x_train = train.iloc[:, 0:value[0]._tags_index].values
+        # we get tags data
+        y_train = train.iloc[:, value[0]._tags_index:].values
 
-        for key, value in df_cards.items():
-            # we get all input data
-            x_train = train.iloc[:, 0:value[0]._tags_index].values
-            # we get tags data
-            y_train = train.iloc[:, value[0]._tags_index:].values
+        #regressor = RandomForestClassifier(n_estimators=100, random_state=0, criterion="entropy")
+        # using cart
+        regressor = DecisionTreeRegressor(random_state=algo_rand)
+        agents[key] = regressor
 
-            #regressor = RandomForestClassifier(n_estimators=100, random_state=0, criterion="entropy")
-            # using cart
-            regressor = DecisionTreeRegressor(random_state=algo_rand)
-            agents[key] = regressor
-
-            # train
-            regressor.fit(x_train, y_train)
+        # train
+        regressor.fit(x_train, y_train)
 
     return agents
 
@@ -402,24 +401,22 @@ def mainCombined():
     plt.show(block=True)
 
 
-def download_zip(url):
-    zip = urllib.request.urlopen('http://samples.zip')
-    dfs = []
-    with zipfile.ZipFile(zip, "r") as f:
-        for name in f.namelist():
-            df = pd.read_csv(f.open(name))
-            df._path = name
-            dfs.append(dfs)
-    print(dfs)
 
-def train(zip_file):
+
+def open_zip(file_path):
     dfs = []
-    with zipfile.ZipFile(zip_file, "r") as f:
-        for name in f.namelist():
-            df = pd.read_csv(f.open(name))
-            df._path = name
-            dfs.append(dfs)
-    print(dfs)
+    try:
+        with zipfile.ZipFile(file_path, "r") as f:
+            for name in f.namelist():
+                df = pd.read_csv(f.open(name))
+                df._path = name
+                dfs.append(df)
+    except Exception as e:
+        print("Open zip error", e)
+        return None
+
+    return dfs   
+
 
 # train(open('./samples.zip', 'r'))
 # train(urllib.request.urlopen('http://samples.zip'))
@@ -427,3 +424,5 @@ def train(zip_file):
 # import requests, zipfile, io
 # r = requests.get(zip_file_url)
 # z = zipfile.ZipFile(io.BytesIO(r.content))
+
+
