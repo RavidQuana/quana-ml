@@ -26,6 +26,13 @@ AWS_ACCESS_KEY  = os.getenv('AWS_ACCESS_KEY', "NOKEY"),
 AWS_SECRET_KEY  = os.getenv('AWS_SECRET_KEY', "NOSECRET"),
 AWS_REGION      = os.getenv('AWS_REGION', "NOREGION")
 
+print(MAIN_SERVER_KEY)
+print(MAIN_SERVER_URL)
+print(AWS_BUCKET)     
+print(AWS_ACCESS_KEY) 
+print(AWS_SECRET_KEY) 
+print(AWS_REGION)
+
 main_folder = "ml"
 
 def train_process(id, url):
