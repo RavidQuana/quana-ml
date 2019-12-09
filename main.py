@@ -18,6 +18,14 @@ load_dotenv()
 from falcon_multipart.middleware import MultipartMiddleware
 
 
+MAIN_SERVER_KEY = os.getenv('MAIN_SERVER_KEY', "Test")
+MAIN_SERVER_URL = os.getenv('MAIN_SERVER_URL', "http://localhost:3000")
+AWS_BUCKET      = os.getenv('AWS_BUCKET', "NOBUCKET")
+
+AWS_ACCESS_KEY  = os.getenv('AWS_ACCESS_KEY', "NOKEY"),
+AWS_SECRET_KEY  = os.getenv('AWS_SECRET_KEY', "NOSECRET"),
+AWS_REGION      = os.getenv('AWS_REGION', "NOREGION")
+
 main_folder = "ml"
 
 def train_process(id, url):
@@ -67,9 +75,9 @@ def try_remove(file_path):
 def s3client():
     return boto3.client(
         's3',
-        aws_access_key_id=os.getenv('AWS_ACCESS_KEY', "NOKEY"),
-        aws_secret_access_key=os.getenv('AWS_SECRET_KEY', "NOSECRET"),
-        region_name=os.getenv('AWS_REGION', "NOREGION")
+        aws_access_key_id=AWS_ACCESS_KEY,
+        aws_secret_access_key=AWS_SECRET_KEY,
+        region_name=AWS_REGION
     )
 
 
@@ -84,10 +92,10 @@ def get_agent(agent_id):
         agent = agents[agent_id][0]
         agents[agent_id] = (agent, gmtime())
         return agent
-    
+
     print("From storage", agent_id)
     try:
-        s3_response_object = s3client().get_object(Bucket=os.getenv('AWS_BUCKET', "NOBUCKET"), Key=main_folder + "/" + agent_id + "/agents.zip")
+        s3_response_object = s3client().get_object(Bucket=AWS_BUCKET, Key=main_folder + "/" + agent_id + "/agents.zip")
         agent = ml.open_zip_agent(io.BytesIO(s3_response_object['Body'].read()))
         if agent != None:
             agents[agent_id] = (agent, gmtime())
@@ -155,7 +163,7 @@ class ClassifyRequest(object):
 class VersionsRequest(object):
     def on_get(self, req, resp):
         versions = []
-        for key in s3client().list_objects(Bucket=os.getenv('AWS_BUCKET', "NOBUCKET"), Prefix=main_folder + "/",
+        for key in s3client().list_objects(Bucket=AWS_BUCKET, Prefix=main_folder + "/",
                                            Delimiter='/').get('CommonPrefixes', []):
             folder_name = key['Prefix'][len(main_folder) + 1:-1]
             versions.append(folder_name)
@@ -164,7 +172,7 @@ class VersionsRequest(object):
         resp.body = (json.dumps(versions))
 
 def download(id, url):
-    req = requests.get(url, headers={'x-api-key': 'Test'}, stream=True)
+    req = requests.get(url, headers={'x-api-key': MAIN_SERVER_KEY}, stream=True)
     
     folder = "./tmp"
 
@@ -184,7 +192,7 @@ def upload(id, file_path, name):
 
     s3_client = s3client()
     try:
-        response = s3_client.upload_file(file_path, os.getenv('AWS_BUCKET', "NOBUCKET"), main_folder + "/" + id + "/" + name)
+        response = s3_client.upload_file(file_path, AWS_BUCKET, main_folder + "/" + id + "/" + name)
     except Exception as e:
         print("Error", e)
         return False
@@ -194,13 +202,13 @@ def update_versions():
     versions = []
     global main_version
 
-    for key in s3client().list_objects(Bucket=os.getenv('AWS_BUCKET', "NOBUCKET"), Prefix=main_folder + "/", Delimiter='/').get('CommonPrefixes', []):
+    for key in s3client().list_objects(Bucket=AWS_BUCKET, Prefix=main_folder + "/", Delimiter='/').get('CommonPrefixes', []):
         folder_name = key['Prefix'][len(main_folder)+1:-1]
         versions.append(folder_name)
     main_version = max(versions)
 
     try:
-        req = requests.get(os.getenv('MAIN_SERVER_URL', "http://localhost:3000") + "/ml/version", headers={'x-api-key': 'Test'})
+        req = requests.get(MAIN_SERVER_URL + "/ml/version", headers={'x-api-key': MAIN_SERVER_KEY})
         result = req.json()
         version = result["version"]
         if version != None and version in versions:
