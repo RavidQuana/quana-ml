@@ -22,16 +22,9 @@ MAIN_SERVER_KEY = os.getenv('MAIN_SERVER_KEY', "Test")
 MAIN_SERVER_URL = os.getenv('MAIN_SERVER_URL', "http://localhost:3000")
 AWS_BUCKET      = os.getenv('AWS_BUCKET', "NOBUCKET")
 
-AWS_ACCESS_KEY  = os.getenv('AWS_ACCESS_KEY', "NOKEY"),
-AWS_SECRET_KEY  = os.getenv('AWS_SECRET_KEY', "NOSECRET"),
+AWS_ACCESS_KEY  = os.getenv('AWS_ACCESS_KEY', "NOKEY")
+AWS_SECRET_KEY  = os.getenv('AWS_SECRET_KEY', "NOSECRET")
 AWS_REGION      = os.getenv('AWS_REGION', "NOREGION")
-
-print(MAIN_SERVER_KEY)
-print(MAIN_SERVER_URL)
-print(AWS_BUCKET)     
-print(AWS_ACCESS_KEY) 
-print(AWS_SECRET_KEY) 
-print(AWS_REGION)
 
 main_folder = "ml"
 
