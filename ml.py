@@ -451,7 +451,7 @@ def classify(agent, file):
             tags_counter[index] += value
 
     result = {}
-    for index, counter in enumerate(tags_counter):
+    for index, counter in tags_counter.items():
         result[tags_order[index]] = (counter / len(pred)) * 100.0
     print(result)
     return result
