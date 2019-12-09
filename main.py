@@ -163,8 +163,7 @@ class ClassifyRequest(object):
 class VersionsRequest(object):
     def on_get(self, req, resp):
         versions = []
-        for key in s3client().list_objects(Bucket=AWS_BUCKET, Prefix=main_folder + "/",
-                                           Delimiter='/').get('CommonPrefixes', []):
+        for key in s3client().list_objects(Bucket=AWS_BUCKET, Prefix=main_folder + "/", Delimiter='/').get('CommonPrefixes', []):
             folder_name = key['Prefix'][len(main_folder) + 1:-1]
             versions.append(folder_name)
 
