@@ -85,8 +85,6 @@ def get_agent(agent_id):
         print("Error getting agent", agent_id, e)
         return None    
           
-        
-
 def classify(agent_id, file):
     agent = get_agent(agent_id)
     print(agent)
@@ -95,7 +93,6 @@ def classify(agent_id, file):
         return None
         
     return ml.classify(agent, file)
-
 
 class TrainRequest(object):
     def on_post(self, req, resp):
@@ -130,11 +127,26 @@ class ClassifyRequest(object):
             return
 
         print(input_file.filename, version)
-        classify(version, input_file.file)
-        resp.status = falcon.HTTP_200  
-        resp.body = (json.dumps({}))
+        output = classify(version, input_file.file)
 
-        
+        if output == None:
+            resp.status = falcon.HTTP_400
+            resp.body = (json.dumps({}))
+            return;
+
+        resp.status = falcon.HTTP_200
+        resp.body = (json.dumps(output))
+
+class VersionsRequest(object):
+    def on_get(self, req, resp):
+        versions = []
+        for key in s3client().list_objects(Bucket=os.getenv('AWS_BUCKET', "NOBUCKET"), Prefix=main_folder + "/",
+                                           Delimiter='/').get('CommonPrefixes', []):
+            folder_name = key['Prefix'][len(main_folder) + 1:-1]
+            versions.append(folder_name)
+
+        resp.status = falcon.HTTP_200
+        resp.body = (json.dumps(versions))
 
 def download(id, url):
     req = requests.get(url, headers={'x-api-key': 'Test'}, stream=True)
@@ -190,4 +202,5 @@ app = falcon.API(middleware=[MultipartMiddleware()])
 # things will handle all requests to the '/things' URL path
 app.add_route('/train', TrainRequest())
 app.add_route('/classify', ClassifyRequest())
+app.add_route('/versions', VersionsRequest())
 

@@ -436,19 +436,25 @@ def classify(agent, file):
     if str(df._card) not in agent:
         return None
 
-    agent = agent[str(df._card)]     
+    regressor = agent[str(df._card)]
     result = {}
 
-    x_test = df.iloc[:, 0:df._tags_index].values
-    y_test = df.iloc[:, 0:df._tags_index].values
-    
-    for target in tags_order:
-        for index, tag in enumerate(tags_order):
-            if tag != target:
-                y_test[:, index] = 0
-                y_pred[:, index] = 0
+    test_data = df.iloc[:, 0:df._tags_index].values
+    pred = regressor.predict(test_data)
 
-    print(df)
+    tags_counter = {}
+    for index, tag in enumerate(tags_order):
+        tags_counter[index] = 0
+
+    for x in pred:
+        for index, value in enumerate(x):
+            tags_counter[index] += value
+
+    result = {}
+    for index, counter in enumerate(tags_counter):
+        result[tags_order[index]] = (counter / len(pred)) * 100.0
+    print(result)
+    return result
 
 # train(open('./samples.zip', 'r'))
 # train(urllib.request.urlopen('http://samples.zip'))
