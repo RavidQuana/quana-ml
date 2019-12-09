@@ -73,13 +73,28 @@ def s3client():
     )
 
 
+#agents simple caching
+max_agents = 10
 agents = {}
 def get_agent(agent_id):
+    global agents;
     agent = {}
+    if agent_id in agents:
+        print("From cache", agent_id)
+        agent = agents[agent_id][0]
+        agents[agent_id] = (agent, gmtime())
+        return agent
+    
+    print("From storage", agent_id)
     try:
         s3_response_object = s3client().get_object(Bucket=os.getenv('AWS_BUCKET', "NOBUCKET"), Key=main_folder + "/" + agent_id + "/agents.zip")
-        #object_content = s3_response_object['Body'].read()
         agent = ml.open_zip_agent(io.BytesIO(s3_response_object['Body'].read()))
+        if agent != None:
+            agents[agent_id] = (agent, gmtime())
+            if len(agents) > max_agents:
+                min_key = min(agents.keys(), key=(lambda k: agents[k][1]))
+                agents.pop(min_key, None)
+
         return agent  
     except Exception as e:
         print("Error getting agent", agent_id, e)
