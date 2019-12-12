@@ -134,7 +134,7 @@ class TrainRequest(object):
         t.start()
 
         resp.status = falcon.HTTP_200  
-        resp.body = (json.dumps({id: id}))
+        resp.body = (json.dumps({'id': id}))
 
 
 class ClassifyRequest(object):
