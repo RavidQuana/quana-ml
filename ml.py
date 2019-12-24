@@ -181,7 +181,7 @@ def export(dfs, lagging, smoothing, algo, algo_rand):
 
         #regressor = RandomForestClassifier(n_estimators=100, random_state=0, criterion="entropy")
         # using cart
-        regressor = DecisionTreeRegressor(random_state=algo_rand)
+        regressor = DecisionTreeClassifier(random_state=algo_rand)
         agents[key] = regressor
 
         # train
@@ -266,7 +266,7 @@ def run(dfs, lagging, smoothing, algo, target, file_rands, algo_rands):
             for algo_rand in algo_rands:
                 #regressor = RandomForestClassifier(n_estimators=100, random_state=0, criterion="entropy")
                 # using cart
-                regressor = DecisionTreeRegressor(random_state=algo_rand)
+                regressor = DecisionTreeClassifier(random_state=algo_rand)
                 agents[key] = regressor
 
                 # train
