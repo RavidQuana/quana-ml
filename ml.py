@@ -56,6 +56,8 @@ def preprocess(df, laggings, smoothing):
     #df.drop("temp", axis=1, inplace=True)
     #df.drop("humidiy", axis=1, inplace=True)
 
+    df.rename(columns={'humidiy': 'humidity'}, inplace=True)
+
     # get mean value of the first 8 seconds (didnt work because it used float and we need integers), so we just take the values at time=8
     relative_points = df.loc[df.time < 8].iloc[-1]
 
