@@ -38,7 +38,7 @@ def allowed_tags():
     return tags_list
 
 def sensor_columns(df):
-    return df.columns[df.columns.str.contains('qcm') | df.columns.str.contains("temp") | df.columns.str.contains("humidiy")]
+    return df.columns[df.columns.str.contains('qcm') | df.columns.str.contains("temp") | df.columns.str.contains("humidity")]
 
 def string_to_arr(text):
     r = reader(StringIO(text[1:-1]), delimiter=',', quotechar='"')
