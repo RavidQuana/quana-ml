@@ -44,7 +44,7 @@ def allowed_tags():
 
 def sensor_columns(df):
     return df.columns[
-        df.columns.str.contains('qcm') | df.columns.str.contains("temp") | df.columns.str.contains("humidiy")]
+        df.columns.str.contains('qcm') | df.columns.str.contains("temp") | df.columns.str.contains("humidity")]
 
 def gcm_columns(df):
     return df.columns[df.columns.str.contains('qcm')]
@@ -65,6 +65,8 @@ def preprocess(df, laggings, smoothing):
     df.drop("card", axis=1, inplace=True)
     # df.drop("temp", axis=1, inplace=True)
     # df.drop("humidiy", axis=1, inplace=True)
+
+    df.rename(columns={'humidiy': 'humidity'}, inplace=True)
 
     # get mean value of the first 8 seconds (didnt work because it used float and we need integers), so we just take the values at time=8
     relative_points = df.loc[df.time < 8].iloc[-1]
@@ -581,6 +583,8 @@ class Agent:
         # drop sample id column
         df.drop("sample", axis=1, inplace=True)
         df.drop("card", axis=1, inplace=True)
+
+        df.rename(columns={'humidiy': 'humidity'}, inplace=True)
 
         for drop in drops:
             df.drop(drop, axis=1, inplace=True)
