@@ -171,18 +171,16 @@ class VersionsRequest(object):
         resp.body = (json.dumps(versions))
 
 def download(id, url):
-    req = requests.get(url, headers={'x-api-key': MAIN_SERVER_KEY}, stream=True)
     
     folder = "./tmp"
-
     if not os.path.exists(folder):
         os.makedirs(folder)
-
     file_name = id + ".zip"
     file_path = folder + "/" + file_name
-
-    with open(file_path, 'wb') as f:
-        shutil.copyfileobj(req.raw, f)
+    
+    with requests.get(url, headers={'x-api-key': MAIN_SERVER_KEY}, stream=True) as req:
+        with open(file_path, 'wb') as f:
+            shutil.copyfileobj(req.raw, f)
 
     return file_path
 
