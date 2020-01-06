@@ -546,6 +546,22 @@ class Agent:
     def preprocess(df, **options):
         split_gcm = options.get('split_gcm', False)
 
+
+        # remove_gcms = {
+        #     1: ["qcm_1", "qcm_5"],
+        #     34: ["qcm_1", "qcm_2", "qcm_5"],
+        #     35: ["qcm_1", "qcm_3"],
+        #     36: ["qcm_1", "qcm_3", "qcm_5"],
+        #     37: ["qcm_2", "qcm_3", "qcm_4", "qcm_5"],
+        #     38: ["qcm_1", "qcm_3", "qcm_4"],
+        #     39: ["qcm_2", "qcm_4"],
+        # }
+        #
+        # card = df['card'].iloc[0]
+        # if card in remove_gcms:
+        #     for sensor in remove_gcms[card]:
+        #         df.drop(sensor, axis=1, inplace=True)
+
         if split_gcm == False:
             df = Agent.single_preprocess(df, **options)
             df._category = "Combined"
@@ -572,6 +588,7 @@ class Agent:
         # filter_pass = options.get('filter_pass', {'N': 3, 'Wn': 0.08})
         filter_pass = options.get('filter_pass', None)
         strip_begin = options.get('strip_begin', 8)
+        relative_begin = options.get('relative_begin', 8)
         rolling = options.get('rolling', None)
         lag = options.get('lag', None)
         drops = options.get('drop', [])
@@ -579,6 +596,8 @@ class Agent:
         # store for later use
         card = df['card'].iloc[0]
         sample = df['sample'].iloc[0]
+
+
 
         # drop sample id column
         df.drop("sample", axis=1, inplace=True)
@@ -591,7 +610,7 @@ class Agent:
 
         # get mean value of the first 8 seconds (didnt work because it used float and we need integers), so we just take the values at time=8
         if strip_begin is not None:
-            relative_points = df.loc[df.time < strip_begin].iloc[-1]
+            relative_points = df.loc[df.time < relative_begin].iloc[-1]
 
         columns = sensor_columns(df)
         gcms_columns = gcm_columns(df)
@@ -639,7 +658,7 @@ class Agent:
             df = df.drop(df[df.time < strip_begin].index).reset_index(drop=True)
 
         # debug
-        # print(df)
+        #print(df)
 
         # add lagging data
         if lag is not None:
@@ -791,8 +810,8 @@ class Agent:
                     # we get tags data
                     y_test = test.iloc[:, samples[0]._tags_index:].values
 
-                    print(x_test)
-                    print(y_test)
+                    #print(x_test)
+                    #print(y_test)
 
                     print("Training...")
                     accuracy = 0
@@ -845,12 +864,13 @@ if True:
     dfs = []
     for file in files:
         df = Agent.open_sample(file)
-        r = Agent.preprocess(df, split_gcm=False)
+        #r = Agent.preprocess(df, split_gcm=False, strip_begin=15, relative_begin=7)
+        r = Agent.preprocess(df, split_gcm=False, strip_begin=10, relative_begin=10)
         #r = Agent.preprocess(df, split_gcm=True, filter_pass={'N': 3, 'Wn': 0.08})
         dfs.extend(r)
 
     #Agent.graph_accuracy(dfs, "Mold", shuffles=5, classifier=RandomForestClassifier)
-    Agent.graph_accuracy(dfs, "Mold", shuffles=10, classifier_options={'criterion': "entropy"})
+    Agent.graph_accuracy(dfs, "Pesticide", shuffles=20, classifier_options={'criterion': "entropy"})
 
 #mainLag()
 
@@ -875,14 +895,14 @@ if True:
 # graph = pydotplus.graph_from_dot_data(dot_data.getvalue())
 # graph.write_png("./graph.png")
 
-# file = glob.glob(os.path.join('data', "*.csv"))[0]
-# #df = read_csv(file)
-# #df = preprocess(df, [], 0)
-#
-# df = Agent.open_sample(file)
-# r = Agent.preprocess(df)
-# print(r[0])
-# graph_for_mold(r[0], [])
+file = glob.glob(os.path.join('data', "*.csv"))[38]
+#df = read_csv(file)
+#df = preprocess(df, [], 0)
+
+df = Agent.open_sample(file)
+r = Agent.preprocess(df, strip_begin=12, relative_begin=8)
+print(r[0])
+graph_for_mold(r[0], [])
 
 
 
