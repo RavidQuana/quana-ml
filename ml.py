@@ -23,6 +23,8 @@ from sklearn.preprocessing import MultiLabelBinarizer
 from concurrent.futures import ThreadPoolExecutor
 import pickle
 import scipy.signal as signal
+import json
+
 
 
 def time_to_state(time):
@@ -37,10 +39,8 @@ def time_to_state(time):
 tags_list = {'Mold', 'Pesticide'}
 tags_order = ['Mold', 'Pesticide']
 
-
 def allowed_tags():
     return tags_list
-
 
 def sensor_columns(df):
     return df.columns[
@@ -54,302 +54,15 @@ def string_to_arr(text):
     arr = next(r, [])
     return [x for x in arr if x in tags_list]
 
-
-def preprocess(df, laggings, smoothing):
-    # store for later use
-    card = df['card'].iloc[0]
-    sample = df['sample'].iloc[0]
-
-    # drop sample id column
-    df.drop("sample", axis=1, inplace=True)
-    df.drop("card", axis=1, inplace=True)
-    # df.drop("temp", axis=1, inplace=True)
-    # df.drop("humidiy", axis=1, inplace=True)
-
-    df.rename(columns={'humidiy': 'humidity'}, inplace=True)
-
-    # get mean value of the first 8 seconds (didnt work because it used float and we need integers), so we just take the values at time=8
-    relative_points = df.loc[df.time < 8].iloc[-1]
-
-    columns = sensor_columns(df)
-    # we only handle 1 tags so 0 = no tags and 1 = mold
-    df.tags = df.tags.apply(string_to_arr)
-
-    mlb = MultiLabelBinarizer()
-    tags = pd.DataFrame(mlb.fit_transform(df['tags']), columns=mlb.classes_, index=df.index)
-
-    # store for later use
-    tags_index = df.columns.get_loc("tags")
-    df = df.drop('tags', axis=1).join(tags)
-
-    for tag in tags_list:
-        if tag not in df:
-            df[tag] = 0
-
-    # reorder columns. important.
-    df = df.reindex(columns=list(df.columns[:tags_index]) + tags_order, copy=False)
-
-    # transform to relative data
-    for column in columns:
-        df[column] -= relative_points[column]
-
-    # for column in columns:
-    #    df[column] = df[column].rolling(window=3).mean()
-
-    if smoothing > 0:
-        for column in columns:
-            # First, design the Buterworth filter
-            N = 3  # Filter order
-            Wn = [0.03, 0.14]  # Cutoff frequency
-            B, A = signal.butter(N, Wn, output='ba', btype="bandstop")
-            # Second, apply the filter
-            df[column] = signal.filtfilt(B, A, df[column])
-
-        # S = 2
-        # for column in columns:
-        # #     #df[column] = df[column].rolling(window=3).mean()
-        #      df[column] = df[column].groupby(df[column].index // S).mean()
-        # df.time = df.time.groupby(df.time.index // S).mean()
-        # df = df[:len(df.index) // S]
-
-    # if smoothing > 0:
-    # grouping
-
-    #
-
-    # remove 8 seconds from data
-    df = df.drop(df[df.time < 8].index).reset_index(drop=True)
-
-    # debug
-    # print(df)
-
-    # add lagging data
-    for column in columns:
-        index = df.columns.get_loc(column)
-        # lagging by n prev values
-        lags = laggings
-
-        for l in lags:
-            if l > 0:
-                df.insert(index, column + "_prev_" + str(l),
-                          df[column].shift(l, fill_value=0))
-        # lagging by n next values
-        index = df.columns.get_loc(column) + 1
-        for l in lags:
-            if l > 0:
-                df.insert(index, column + "_next_" + str(l),
-                          df[column].shift(-l, fill_value=0))
-
-    # add step to help the learner
-    # df.insert(3, "step", df.time.apply(time_to_state))
-    # map time from secs to 0...1 where 0 is start and 1 is end
-    # df.time = minmax_scale(df[['time']], copy=False)
-
-    tags_index = df.columns.get_loc("Mold")
-    df._sample = sample
-    df._card = card
-    df._tags_index = tags_index
-
-    return df
-
-
-def accuracy(result, tag):
-    return (np.count_nonzero(result[:, tag]) / result.size) * 100
-
-
-def graph_for_mold(df, results):
-    ax = plt.gca()
-    for column in sensor_columns(df):
-        df.plot(kind='line', x='time', y=column, ax=ax, figsize=(10, 5))
-    # df.plot(kind='scatter',x='time',y="result",ax=ax,color='red')
-    for index, r in enumerate(results):
-        if r[1] == 1:
-            ax.axvline(x=df.time.iloc[index],
-                       color='blue', linestyle='--', alpha=0.1)
-        if r[0] == 1:
-            ax.axvline(x=df.time.iloc[index],
-                       color='black', linestyle='--', alpha=0.1)
-    plt.show(block=True)
-
-
-def check_for_mold(path):
-    df = preprocess(pd.read_csv(path))
-    result = agents[df._card].predict(df.iloc[:, 0:df._tags_index].values)
-    print("testing " + path, accuracy(result, 0))
-
-
-def load_df(df, laggings, smoothing):
-    return preprocess(df, laggings, smoothing)
-
-
-def export(dfs, lagging, smoothing, algo, algo_rand):
-    # load all filees
-    print("Preprocessing...")
-
-    #with ThreadPoolExecutor(max_workers=12) as executor:
-    dfs = map(lambda x: load_df(x.copy(deep=True), lagging, smoothing), dfs)
-
-    df_cards = {}
-    agents = {}
-    # split by card
-    for member in dfs:
-        card = member._card
-        if card in df_cards:
-            df_cards[card].append(member)
-        else:
-            df_cards[card] = [member]
-
-    for key, value in df_cards.items():
-        train = pd.concat(value, sort=False)
-
-        # we get all input data
-        x_train = train.iloc[:, 0:value[0]._tags_index].values
-        # we get tags data
-        y_train = train.iloc[:, value[0]._tags_index:].values
-
-        # regressor = RandomForestClassifier(n_estimators=100, random_state=0, criterion="entropy")
-        # using cart
-        regressor = DecisionTreeRegressor(random_state=algo_rand)
-        agents[key] = regressor
-
-        # train
-        regressor.fit(x_train, y_train)
-
-    return agents
-
-
-def run(dfs, lagging, smoothing, algo, target, file_rands, algo_rands):
-    # load all filees
-
-    print("Preprocessing...")
-
-    # pool = Pool(8)
-    with ThreadPoolExecutor(max_workers=12) as executor:
-        dfs = executor.map(lambda x: load_df(x.copy(deep=True), lagging, smoothing), dfs)
-    # pool.close()
-    # pool.join()
-
-    print("Starting routines")
-
-    df_cards = {}
-    agents = {}
-    # split by card
-    for member in dfs:
-        card = member._card
-        if card in df_cards:
-            df_cards[card].append(member)
-        else:
-            df_cards[card] = [member]
-
-    final_results = {}
-
-    for file_rand in file_rands:
-        rand = random.Random(file_rand)
-        results = {}
-        for key, value in df_cards.items():
-            # split test and train, we take only small amount for testing because we have dont have enough data
-            mold = list(filter(lambda x: x[target].iloc[0] == 1, value))
-            not_mold = list(filter(lambda x: x[target].iloc[0] != 1, value))
-
-            print("Card id:", key)
-            print(target + " count:", len(mold))
-            print("Non-" + target + " count:", len(not_mold))
-
-            if (len(mold) < 3 or len(not_mold) < 3):
-                print("card does not have enough samples, skipping")
-                continue
-
-            test_count_mold = max(int(0.1 * len(mold)), 3)
-            test_count_non_mold = test_count_mold  # max(int(0.1 * len(not_mold)), 3)
-
-            rand.shuffle(mold)
-            rand.shuffle(not_mold)
-
-            train = itertools.chain(mold[:-test_count_mold],
-                                    not_mold[:-test_count_non_mold])
-            test = itertools.chain(mold[-test_count_mold:],
-                                   not_mold[-test_count_non_mold:])
-
-            print("Training size", target, ":", len(mold) - test_count_mold,
-                  "non-", target, ":", len(not_mold) - test_count_non_mold)
-            print("Testing size", target, ":", test_count_mold,
-                  "non-", target, ":", test_count_non_mold)
-
-            # combine all files
-            train = pd.concat(train, sort=False)
-            test = pd.concat(test, sort=False)
-
-            # print(train)
-
-            # we get all input data
-            x_train = train.iloc[:, 0:value[0]._tags_index].values
-            # we get tags data
-            y_train = train.iloc[:, value[0]._tags_index:].values
-
-            # testing not used here because we do manually testing
-            # we get all input data
-            x_test = test.iloc[:, 0:value[0]._tags_index].values
-            # we get tags data
-            y_test = test.iloc[:, value[0]._tags_index:].values
-
-            print("Training...")
-            for algo_rand in algo_rands:
-                #regressor = RandomForestClassifier(n_estimators=1 + est * 10, random_state=algo_rand,
-                 #                                  criterion="entropy")
-                # using cart
-                regressor = DecisionTreeClassifier(random_state=algo_rand)
-                agents[key] = regressor
-
-                # train
-                regressor.fit(x_train, y_train)
-
-                y_pred = regressor.predict(x_test)
-                # print("confusion_matrix: ", confusion_matrix(y_test.argmax(axis=1), y_pred.argmax(axis=1)))
-                # print(classification_report(y_test, y_pred))
-                for index, tag in enumerate(tags_order):
-                    if tag != target:
-                        y_test[:, index] = 0
-                        y_pred[:, index] = 0
-
-                print("accuracy_score: ", accuracy_score(y_test, y_pred) * 100)
-                results[key] = results.get(key, 0) + accuracy_score(y_test, y_pred) * 100
-                continue
-
-                print("\nTesting on testing data...\n")
-
-                for sample in mold[-test_count_mold:]:
-                    result = regressor.predict(sample.iloc[:, 0:sample._tags_index].values)
-                    # result_prob = regressor.predict_proba(sample.iloc[:, 0:sample._tags_index].values)
-                    # print(result)
-                    print(target + " test " + sample._path + ":",
-                          accuracy_score(sample.iloc[:, sample._tags_index:], result) * 100)
-                    # print("prob:", result_prob[0])
-                    # graph_for_mold(sample, result)
-                    print(
-                        "https://quana-server-production.herokuapp.com/admin/sample_betas/" + str(sample._sample))
-                    print()
-
-                for sample in not_mold[-test_count_non_mold:]:
-                    result = regressor.predict(sample.iloc[:, 0:sample._tags_index].values)
-                    # result_prob = regressor.predict_proba(sample.iloc[:, 0:sample._tags_index].values)
-                    print("non " + target + "test " + sample._path + ":",
-                          accuracy_score(sample.iloc[:, sample._tags_index:], result) * 100)
-                    # print("prob:", result_prob[0])
-                    # graph_for_mold(sample, result)
-                    print(
-                        "https://quana-server-production.herokuapp.com/admin/sample_betas/" + str(sample._sample))
-                    print()
-
-                print("\n########\n")
-
-        for key in results:
-            final_results[key] = final_results.get(key, 0) + (results[key] / len(algo_rands))
-
-    for key in final_results:
-        final_results[key] /= len(file_rands)
-
-    return final_results
-
+def train(dfs):
+    agent = Agent({}, remove_gcm=True)
+
+    new_dfs = []
+    for df in dfs:
+        new_dfs.extend(agent.preprocess(df))
+
+    agent.train(new_dfs)
+    return agent
 
 def read_csv(file):
     df = pd.read_csv(file)
@@ -357,128 +70,9 @@ def read_csv(file):
     return df
 
 
-def mainLag():
-    files = glob.glob(os.path.join('data', "*.csv"))
-    files.sort()
-
-    dfs = list(map(read_csv, files))
-
-    cards = {}
-    target = "Mold"
-
-    lag_max = 2
-    x = list(range(0, lag_max))
-    for lag in x:
-        print("Lag:", lag)
-        results = run(dfs, [lag], 0, "entropy", target, range(0, 10), range(0, 5))
-        for key, value in results.items():
-            cards[key] = cards.get(key, np.zeros(lag_max))
-            cards[key][lag] = value
-
-    ax = plt.gca()
-    for key, value in cards.items():
-        ax.plot(x, value, label=str(key))
-
-    ax.set_ylabel('Accuracy')
-    ax.set_xlabel('Lag')
-    plt.legend(title='Cards:')
-    plt.title('Lagging Check ' + target)
-    plt.show(block=True)
-
-
-def mainSmooth():
-    files = glob.glob(os.path.join('data', "*.csv"))
-    files.sort()
-
-    dfs = list(map(read_csv, files))
-
-    cards = {}
-    target = "Mold"
-
-    arg_max = 2
-    x = list(range(0, arg_max))
-    for smooth in x:
-        print("Smooth:", smooth)
-        results = run(dfs, [1, 2, 3, 4], smooth, "entropy", target, range(0, 5), range(0, 5))
-        for key, value in results.items():
-            cards[key] = cards.get(key, np.zeros(arg_max))
-            cards[key][smooth] = value
-
-    ax = plt.gca()
-    for key, value in cards.items():
-        ax.plot(x, value, label=str(key))
-
-    ax.set_ylabel('Accuracy')
-    ax.set_xlabel('Smoothing')
-    plt.legend(title='Cards:')
-    plt.title('Smoothing Check ' + target)
-    plt.show(block=True)
-
-
-def mainEstimators():
-    files = glob.glob(os.path.join('data', "*.csv"))
-    files.sort()
-
-    dfs = list(map(read_csv, files))
-
-    cards = {}
-    target = "Mold"
-
-    arg_max = 10
-    x = list(range(0, arg_max))
-    for smooth in x:
-        print("Estimators:", smooth)
-        results = run(dfs, [], 0, "entropy", target, range(0, 5), range(0, 3), smooth)
-        for key, value in results.items():
-            cards[key] = cards.get(key, np.zeros(arg_max))
-            cards[key][smooth] = value
-
-    ax = plt.gca()
-    for key, value in cards.items():
-        ax.plot(x, value, label=str(key))
-
-    ax.set_ylabel('Accuracy')
-    ax.set_xlabel('Smoothing')
-    plt.legend(title='Cards:')
-    plt.title('Smoothing Check ' + target)
-    plt.show(block=True)
-
-
-def mainCombined():
-    files = glob.glob(os.path.join('data', "*.csv"))
-    files.sort()
-
-    dfs = list(map(read_csv, files))
-
-    cards = {}
-    target = "Mold"
-
-    results = run(dfs, [1, 2], 2, "entropy", target, range(0, 10), range(0, 5))
-    for key, value in results.items():
-        cards[key] = cards.get(key, 0)
-        cards[key] = value
-
-    ax = plt.gca()
-    for key, value in cards.items():
-        ax.plot([1, 2, 3], [value, value, value], label=str(key))
-
-    ax.set_ylabel('Accuracy')
-    ax.set_xlabel('Dummy')
-    plt.legend(title='Cards:')
-    plt.title('Smooth 2 Lag [1,2] ' + target)
-    plt.show(block=True)
-
-
 def open_zip_agent(file):
-    agent = {}
-    try:
-        with zipfile.ZipFile(file, "r") as f:
-            for name in f.namelist():
-                agent[name] = pickle.load(f.open(name))
-    except Exception as e:
-        print("Open zip error", e)
-        return None
-
+    agent = Agent.import_file(file)  
+    agent.options["remove_gcm"] = True
     return agent
 
 
@@ -498,42 +92,41 @@ def open_zip(file_path):
 
 
 def classify(agent, file):
-    df = pd.read_csv(file)
-    df._path = "Sample"
-    df = load_df(df, [], 0)
-
-    if str(df._card) not in agent:
-        return None
-
-    regressor = agent[str(df._card)]
-    result = {}
-
-    test_data = df.iloc[:, 0:df._tags_index].values
-    pred = regressor.predict(test_data)
-
-    tags_counter = {}
-    for index, tag in enumerate(tags_order):
-        tags_counter[index] = 0
-
-    for x in pred:
-        for index, value in enumerate(x):
-            tags_counter[index] += value
-
-    result = {}
-    for index, counter in tags_counter.items():
-        result[tags_order[index]] = (counter / len(pred)) * 100.0
-    print(result)
-    return result
+    return agent.classify(file)
 
 
 class Agent:
-    def __init__(self, **options):
+    def __init__(self, agents, **options):
         self.options = options
-        self.agents = {}
+        self.agents = agents or {}
 
     @staticmethod
-    def from_file(file):
-        return Agent()
+    def import_file(path):
+        agents = {}
+        options = {}
+        try:
+            with zipfile.ZipFile(path, "r") as f:
+                for name in f.namelist():
+                    if name == "settings.json": 
+                        options = json.loads(f.open(name).read())
+                    else:
+                        agents[name] = pickle.load(f.open(name))
+        except Exception as e:
+            print("Open zip error", e)
+            return None
+        return Agent(agents, **options)
+
+ 
+    def export_file(self, path):
+        try:
+            with zipfile.ZipFile(path, "w") as zf: 
+                for card, agent in self.agents.items():
+                    zf.writestr(str(card), pickle.dumps(agent))
+                zf.writestr("settings.json", json.dumps(self.options))
+        except Exception as e:
+            print("export agent error", e)
+            return False
+        return True
 
     @staticmethod
     def open_sample(file):
@@ -542,25 +135,26 @@ class Agent:
         return df
 
 
-    @staticmethod
-    def preprocess(df, **options):
+    def preprocess(self, df):
+        options = self.options
         split_gcm = options.get('split_gcm', False)
 
-
-        # remove_gcms = {
-        #     1: ["qcm_1", "qcm_5"],
-        #     34: ["qcm_1", "qcm_2", "qcm_5"],
-        #     35: ["qcm_1", "qcm_3"],
-        #     36: ["qcm_1", "qcm_3", "qcm_5"],
-        #     37: ["qcm_2", "qcm_3", "qcm_4", "qcm_5"],
-        #     38: ["qcm_1", "qcm_3", "qcm_4"],
-        #     39: ["qcm_2", "qcm_4"],
-        # }
-        #
-        # card = df['card'].iloc[0]
-        # if card in remove_gcms:
-        #     for sensor in remove_gcms[card]:
-        #         df.drop(sensor, axis=1, inplace=True)
+        remove_gcm = options.get('remove_gcm', None)
+        if remove_gcm is not None:
+            remove_gcms = {
+                1: ["qcm_1", "qcm_5"],
+                34: ["qcm_1", "qcm_2", "qcm_5"],
+                35: ["qcm_1", "qcm_3"],
+                36: ["qcm_1", "qcm_3", "qcm_5"],
+                37: ["qcm_2", "qcm_3", "qcm_4", "qcm_5"],
+                38: ["qcm_1", "qcm_3", "qcm_4"],
+                39: ["qcm_2", "qcm_4"],
+            }
+            
+            card = df['card'].iloc[0]
+            if card in remove_gcms:
+                for sensor in remove_gcms[card]:
+                    df.drop(sensor, axis=1, inplace=True)
 
         if split_gcm == False:
             df = Agent.single_preprocess(df, **options)
@@ -602,6 +196,10 @@ class Agent:
         # drop sample id column
         df.drop("sample", axis=1, inplace=True)
         df.drop("card", axis=1, inplace=True)
+
+        product = None
+        if 'product' in df.columns:
+            product = df.drop("product", axis=1, inplace=True);
 
         df.rename(columns={'humidiy': 'humidity'}, inplace=True)
 
@@ -687,6 +285,7 @@ class Agent:
         df._sample = sample
         df._card = card
         df._tags_index = tags_index
+        df._product = product
 
         return df
 
@@ -712,9 +311,11 @@ class Agent:
         plt.show(block=block)
 
     def classify(self, file):
-        df = self.preprocess(file)
+        if file is not pd.DataFrame:
+            file = Agent.open_sample(file)
+        df = self.preprocess(file)[0]
+        
         classifier = self.get_classifier(df)
-
         if classifier is None:
             return None
 
@@ -734,6 +335,36 @@ class Agent:
             result[tags_order[index]] = (counter / len(pred)) * 100.0
 
         return result
+
+    def train(self, dfs, **options):
+        print("Training...")
+
+        df_cards = {}
+        # split by card
+        for member in dfs:
+            card = member._card
+            df_cards.setdefault(card, []).append(member)
+
+        classifier = options.get("classifier", DecisionTreeClassifier)
+        options = options.get("classifier_options", {})
+
+        for card_id, samples in df_cards.items():
+            # combine all files
+            train = pd.concat(samples, sort=False)
+        
+            #print(train)
+
+            # we get all input data
+            x_train = train.iloc[:, 0:samples[0]._tags_index].values
+            # we get tags data
+            y_train = train.iloc[:, samples[0]._tags_index:].values
+
+            regressor = classifier(**options)
+            # train
+            regressor.fit(x_train, y_train)
+            self.agents[str(card_id)] = regressor
+
+        print("Done Training.")
 
     @staticmethod
     def graph_accuracy(dfs, target, **options):
@@ -797,7 +428,7 @@ class Agent:
                     train = pd.concat(train, sort=False)
                     test = pd.concat(test, sort=False)
 
-                    # print(train)
+                    #print(train)
 
                     # we get all input data
                     x_train = train.iloc[:, 0:samples[0]._tags_index].values
@@ -855,22 +486,38 @@ class Agent:
 
         return results
 
-
-if True:
+def test():
     files = glob.glob(os.path.join('data', "*.csv"))
     files.sort()
     print("Preprocessing...")
 
+    agent = Agent({}, split_gcm=False, remove_gcm=True, strip_begin=8, relative_begin=8)
+    #r = Agent.preprocess(df, split_gcm=False, strip_begin=15, relative_begin=7)
+    #r = Agent.preprocess(df, split_gcm=True, filter_pass={'N': 3, 'Wn': 0.08})
+
     dfs = []
+    
     for file in files:
         df = Agent.open_sample(file)
-        #r = Agent.preprocess(df, split_gcm=False, strip_begin=15, relative_begin=7)
-        r = Agent.preprocess(df, split_gcm=False, strip_begin=10, relative_begin=10)
-        #r = Agent.preprocess(df, split_gcm=True, filter_pass={'N': 3, 'Wn': 0.08})
+        r = agent.preprocess(df)
         dfs.extend(r)
 
     #Agent.graph_accuracy(dfs, "Mold", shuffles=5, classifier=RandomForestClassifier)
-    Agent.graph_accuracy(dfs, "Pesticide", shuffles=20, classifier_options={'criterion': "entropy"})
+    #Agent.graph_accuracy(dfs, "Pesticide", shuffles=20, classifier_options={'criterion': "entropy"})
+    agent.train(dfs, classifier_options={'criterion': "entropy"})
+    #print(agent.agents)
+    agent.export_file("./test.zip")
+
+    files = glob.glob(os.path.join('./classify', "*.csv"))
+    files.sort()
+    for file in files:
+        print(agent.classify(file))
+
+    agent = Agent.import_file("./test.zip")   
+    for file in files:
+        print(file, agent.classify(file))
+
+#test()    
 
 #mainLag()
 
@@ -895,14 +542,14 @@ if True:
 # graph = pydotplus.graph_from_dot_data(dot_data.getvalue())
 # graph.write_png("./graph.png")
 
-file = glob.glob(os.path.join('data', "*.csv"))[38]
-#df = read_csv(file)
-#df = preprocess(df, [], 0)
+# file = glob.glob(os.path.join('data', "*.csv"))[38]
+# # #df = read_csv(file)
+# # #df = preprocess(df, [], 0)
 
-df = Agent.open_sample(file)
-r = Agent.preprocess(df, strip_begin=12, relative_begin=8)
-print(r[0])
-graph_for_mold(r[0], [])
+# df = Agent.open_sample(file)
+# r = Agent({}, strip_begin=12, relative_begin=8).preprocess(df)
+# print(r[0])
+# graph_for_mold(r[0], [])
 
 
 

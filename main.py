@@ -47,14 +47,12 @@ def train_process(id, url):
     try_remove(path)
 
     print("Trainings:",id, url)
-    agents = ml.export(dfs, [], 0, "entropy", 0)
-    print(agents)
+    agent = ml.train(dfs)
+    print(agent)
 
     print("Exporting:",id, url)
     path = "./tmp/" + id + "_agents.zip"
-    with zipfile.ZipFile(path, "w") as zf: 
-        for card, agent in agents.items():
-            zf.writestr(str(card), pickle.dumps(agent))
+    agent.export_file(path)
     print("Uploading export:",id, url)
     upload(id, path, "agents.zip")
     print("Done", id, url)
@@ -110,10 +108,10 @@ def get_agent(agent_id):
           
 def classify(agent_id, file):
     agent = get_agent(agent_id)
-    print(agent)
-
     if agent == None:
         return None
+
+    print(agent.agents)
         
     return ml.classify(agent, file)
 
