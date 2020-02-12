@@ -146,7 +146,7 @@ class Agent:
                 34: ["qcm_1", "qcm_2", "qcm_5"],
                 35: ["qcm_1", "qcm_3"],
                 36: ["qcm_1", "qcm_3", "qcm_5"],
-                37: ["qcm_2", "qcm_3", "qcm_4", "qcm_5"],
+                37: ["qcm_1", "qcm_3", "qcm_4", "qcm_5"],
                 38: ["qcm_1", "qcm_3", "qcm_4"],
                 39: ["qcm_2", "qcm_4"],
             }
