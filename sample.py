@@ -1,6 +1,8 @@
 import signal_process
-import feture_extractor
+import feature_extractor
 import matplotlib.pyplot as plt
+import os
+import constants
 sorted_samples = {}
 
 class DataSample:
@@ -26,7 +28,7 @@ class channel_data:
         return
 
 def sort_samples(samples_array):
-    prot = feture_extractor.protocol_attr()
+    prot = feature_extractor.protocol_attr()
     for sample in samples_array:
         if sample.sampler_type not in sorted_samples:
             sorted_samples[sample.sampler_type] = {}
@@ -48,11 +50,16 @@ def sort_samples(samples_array):
             ch_data.values[channel] = signal_process.smooth(ch_data.values[channel])
             ch_data.derviate_1 = signal_process.get_derivate_1(ch_data.values[channel])
             ch_data.derviate_2 = signal_process.get_derivate_2(ch_data.values[channel])
-            ch_data.picks_list = feture_extractor.get_picks_indexes(ch_data, 0, ch_data.values.size)
-            ch_data.features = feture_extractor.extract_fetures(ch_data, prot)
+            ch_data.picks_list = feature_extractor.get_picks_indexes(ch_data, 0, ch_data.values.size)
             ch_data.protocol = prot
+            feature_extractor.extract_features(ch_data, prot)
             sorted_samples[sample.sampler_type][brand_prod][card_channel].append(ch_data)
-
+    datestr = constants.get_date_str()
+    features_results_dir = constants.path_result_dir + datestr + constants.path_features_dir    
+    features_file_name = features_results_dir + "features_" + "_" + datestr + ".csv"    
+    if not os.path.exists(features_results_dir):
+        os.makedirs(features_results_dir)
+    feature_extractor.flush_features_data_frame(features_file_name)
 
     
             

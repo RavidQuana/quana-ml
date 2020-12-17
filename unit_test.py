@@ -2,7 +2,7 @@ import sample_file_parser
 import signal_process
 import sample
 import similarity
-import feture_extractor
+import feature_extractor
 import graphs_creator
 import sample_file_parser
 zip_file_path = "C:/Users/ravid/Downloads/samples.zip"
@@ -24,8 +24,9 @@ for prod in sample.sorted_samples['prototype_1_aromabit']:
     for chan in sample.sorted_samples['prototype_1_aromabit'][prod]:
         print( "----------------------Chan = " + chan + "---------------------")
         similarity.group_by_similarity(sample.sorted_samples['prototype_1_aromabit'][prod][chan])
-        for grp in similarity.similarity_dict:
-            grp_stat = similarity.similarity_dict[grp]
-            print (grp + ": mebers_count = " + str(grp_stat.members_count))
-            print ("max sim = " + str(grp_stat.max_similarity))
-            print ("min sim = " + str(grp_stat.min_similarity))
+        for data_type in similarity.similarity_dict:
+            for grp in similarity.similarity_dict[data_type]:
+                grp_stat = similarity.similarity_dict[data_type][grp]
+                print (grp + ": mebers_count = " + str(grp_stat.members_count))
+                print ("max sim = " + str(grp_stat.max_similarity))
+                print ("min sim = " + str(grp_stat.min_similarity))
