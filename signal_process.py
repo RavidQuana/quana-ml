@@ -28,8 +28,8 @@ def smooth(x,window_len=50,window='hanning'):
     return y[:x.size]
 
 
-def get_derivate_1(data_array):
+def get_derivative_1(data_array):
     return np.diff(data_array, 1)
 
-def get_derivate_2(data_array):
+def get_derivative_2(data_array):
     return np.diff(data_array, 2)

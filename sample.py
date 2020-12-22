@@ -19,7 +19,7 @@ class channel_data:
     sample_id = 0
     values = None
     derviate_1 = None
-    derivate_2 = None
+    derivative_2 = None
     picks_list = None
     features = None
     protocol = None
@@ -48,8 +48,8 @@ def sort_samples(samples_array):
             ch_data.values = sample.values[["time", channel]]
             ch_data.values[channel] -= ch_data.values[channel][30]
             ch_data.values[channel] = signal_process.smooth(ch_data.values[channel])
-            ch_data.derviate_1 = signal_process.get_derivate_1(ch_data.values[channel])
-            ch_data.derviate_2 = signal_process.get_derivate_2(ch_data.values[channel])
+            ch_data.derviate_1 = signal_process.get_derivative_1(ch_data.values[channel])
+            ch_data.derviate_2 = signal_process.get_derivative_2(ch_data.values[channel])
             ch_data.picks_list = feature_extractor.get_picks_indexes(ch_data, 0, ch_data.values.size)
             ch_data.protocol = prot
             feature_extractor.extract_features(ch_data, prot)

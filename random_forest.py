@@ -82,5 +82,5 @@ def runRandomForest(dataframe):
     if not os.path.exists(out_dir_path):
         os.makedirs(out_dir_path)
     plt.savefig(out_dir_path + graph_file_name)
-    plt.show()    
-    
+    #plt.show()    
+    plt.close()

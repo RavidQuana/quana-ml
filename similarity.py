@@ -1,6 +1,7 @@
 import scipy.stats
 import scipy.signal as sig
 import pandas as pd
+import sample_file_parser
 
 class group_stat:
     members_count = 1
@@ -18,10 +19,17 @@ group_raw_counter = 1
 group_first_der_counter = 1
 group_second_der_counter = 1
 raw_data_key = "raw"
-first_derivate_key = "first_derivate"
-second_derivate_key = "second_derivate"
+first_derivative_key = "first_derivative"
+second_derivative_key = "second_derivative"
 
-
+class bad_sample:
+    sample_id = 0
+    tags = ''
+    group =''
+    refcount = 0
+    key = ''
+    chan_card = ''
+bad_sample_dict = {}
 
 def getPearsonSimi(array_src, array_compare):
     return scipy.stats.pearsonr(array_src, array_compare)[0]
@@ -51,17 +59,17 @@ def compare_simi_to_group(chan_data, group, key):
     data_array = chan_data.values
     if key == raw_data_key:
         src_array = data_array[data_array.columns[1]]
-    elif key == first_derivate_key:
+    elif key == first_derivative_key:
         src_array = chan_data.derviate_1
-    elif key == second_derivate_key:
+    elif key == second_derivative_key:
         src_array = chan_data.derviate_2
         
     for data in group.chan_data_array:
         if key == raw_data_key:
             comapare_array = data.values[data.values.columns[1]]
-        elif key == first_derivate_key:
+        elif key == first_derivative_key:
             comapare_array = data.derviate_1
-        elif key == second_derivate_key:
+        elif key == second_derivative_key:
             comapare_array = data.derviate_2
             
         sim_val = getSimilarity(src_array, comapare_array)
@@ -82,16 +90,47 @@ def compare_simi_to_group(chan_data, group, key):
         group.members_count +=1
     return belong_to_group
 
+def check_bad_samples(key):
+    for data_type in similarity_dict:
+        for grp in similarity_dict[data_type]:
+            grp_stat = similarity_dict[data_type][grp]
+            tags = sample_file_parser.get_sample_tag(grp_stat.chan_data_array[0].sample_id)
+            bad_sample_list = []
+            is_bad_sample = False
+            for ch_data in grp_stat.chan_data_array:
+                tag_next = sample_file_parser.get_sample_tag(ch_data.sample_id)
+                curr_bad_sample = bad_sample()
+                curr_bad_sample.sample_id = ch_data.sample_id
+                curr_bad_sample.tags = tag_next
+                curr_bad_sample.group = grp
+                curr_bad_sample.key = key
+                card = sample_file_parser.get_sample_card(ch_data.sample_id)
+                chan_name = ch_data.values.columns[1]
+                curr_bad_sample.chan_card = card + "_" + chan_name
+                bad_sample_list.append(curr_bad_sample)
+                if (tag_next != tags):
+                    is_bad_sample = True
+            if is_bad_sample:
+                for bad_samp in bad_sample_list:
+                    bad_samp_key = bad_samp.key + "_" + bad_samp.chan_card+ "_" + str(bad_samp.sample_id)
+                    if bad_samp_key in bad_sample_dict:
+                        bad_sample_dict[bad_samp_key].refcount += 1
+                    else:
+                        bad_sample_dict[bad_samp_key] = bad_samp
+                        bad_sample_dict[bad_samp_key].refcount = 1    
+
 def group_by_similarity(chan_data_array):
     group_key = ""
     similarity_dict.clear()
     similarity_dict[raw_data_key] = {}
-    similarity_dict[first_derivate_key] = {}
-    similarity_dict[second_derivate_key] = {}
+    similarity_dict[first_derivative_key] = {}
+    similarity_dict[second_derivative_key] = {}
     group_by_similarity_key(chan_data_array, raw_data_key)
-    group_by_similarity_key(chan_data_array, first_derivate_key)
-    group_by_similarity_key(chan_data_array, second_derivate_key)
-    
+    check_bad_samples(raw_data_key)
+    group_by_similarity_key(chan_data_array, first_derivative_key)
+    check_bad_samples(first_derivative_key)
+    group_by_similarity_key(chan_data_array, second_derivative_key)
+    check_bad_samples(second_derivative_key)
 
                       
 def group_by_similarity_key(chan_data_array, key):
@@ -99,9 +138,9 @@ def group_by_similarity_key(chan_data_array, key):
     
     if key == raw_data_key:
         group_raw_counter = 1
-    elif key == first_derivate_key:
+    elif key == first_derivative_key:
         group_first_der_counter = 1
-    elif key == second_derivate_key:
+    elif key == second_derivative_key:
         group_second_der_counter = 1
     for chan_data in chan_data_array:
         create_new_group = False
@@ -118,10 +157,10 @@ def group_by_similarity_key(chan_data_array, key):
             if key == raw_data_key:
                 group_counter = group_raw_counter
                 group_raw_counter += 1
-            elif key == first_derivate_key:
+            elif key == first_derivative_key:
                 group_counter = group_first_der_counter
                 group_first_der_counter += 1
-            elif key == second_derivate_key:
+            elif key == second_derivative_key:
                 group_counter = group_second_der_counter
                 group_second_der_counter += 1            
             group_key = group_prefix + str(group_counter)

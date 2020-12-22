@@ -35,7 +35,7 @@ def extract_zip_file(file_path):
                 nextsample = detect_sample_attr(header_df)
                 nextsample.ID = df[id_col_name][0]
                 nextsample.tags = df[tags_col_name][0]
-                nextsample.values = df.drop(columns=[id_col_name, tags_col_name, card_num_col_name])
+                nextsample.values = df.drop(columns=[id_col_name, tags_col_name, card_num_col_name, constants.temp_col_name, constants.humidity_col_name])
                 Samples.append(nextsample)
     except Exception as e:
         print("Open zip error", e)

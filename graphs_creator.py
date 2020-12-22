@@ -2,7 +2,7 @@ import os
 import plotly.express as px
 import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
-
+import numpy as np
 import constants
 import sample 
 import feature_extractor
@@ -69,14 +69,79 @@ def create_graphs_by_prod():
     for samp_type in sample.sorted_samples:
         for prod in sample.sorted_samples[samp_type]:
             for chan in sample.sorted_samples[samp_type][prod]:
+                if chan == constants.temp_col_name or chan == constants.humidity_col_name:
+                    continue
                 similarity.group_by_similarity(sample.sorted_samples[samp_type][prod][chan])
                 create_sim_plots(similarity.similarity_dict, chan)
+
+def create_mean_graphs(chan_array):
+    tags_dict = {}
+    first_ch_data = chan_array[0]
+    card = sample_file_parser.get_sample_card(first_ch_data.sample_id)
+    product = sample_file_parser.get_sample_prod(first_ch_data.sample_id)
+    amount_of_samples = len(chan_array)
+    channel = first_ch_data.values.columns[1]
+    for ch_data in chan_array:
+        tags = sample_file_parser.get_sample_tag(ch_data.sample_id)
+        if tags not in tags_dict:
+            tags_dict[tags] = {}
+            tags_dict[tags][similarity.raw_data_key] = []
+            tags_dict[tags][similarity.first_derivative_key] = []
+            tags_dict[tags][similarity.second_derivative_key] = []
+        line = np.array(ch_data.values[ch_data.values.columns[1]])
+        tags_dict[tags][similarity.raw_data_key].append(line.copy())
+        line = np.array(ch_data.derviate_1)
+        tags_dict[tags][similarity.first_derivative_key].append(line.copy())
+        line = np.array(ch_data.derviate_2)
+        tags_dict[tags][similarity.second_derivative_key].append(line.copy())        
+    mean_lines = {}
+    for tags in tags_dict:
+        mean_lines[tags] = {}
+        for key in tags_dict[tags]:
+            line_list = list(tags_dict[tags][key])
+            length = len(line_list)
+            sum_array = np.sum(line_list, axis=0)
+            mean_line = sum_array/length
+            mean_lines[tags][key] = mean_line
+    figW=18
+    figH=10    
+    fig, ax = plt.subplots(3, 1, figsize=(figW, figH))
+    time_array = get_time_array()
+    for tags in mean_lines:
+        i = 0
+        for data_type in mean_lines[tags]:        
+            line = mean_lines[tags][data_type]
+            ax[i].plot(time_array[0:509], line[0:509], label=tags)
+            ax[i].legend(loc='upper left', bbox_to_anchor=(-0.2, 1.3))
+            i += 1
+    
+    ax[0].set_title(similarity.raw_data_key)
+    ax[1].set_title(similarity.first_derivative_key)
+    ax[2].set_title(similarity.second_derivative_key)
+    plt.subplots_adjust(hspace=0.3, left=0.18, bottom=1/figH, top=1-1/figH)
+    suptitle = "card: " + card + ", channel: " + channel + ", Product: " + product +"\n" + "amount of samples = " + str(amount_of_samples)
+    fig.suptitle(suptitle, y=1)   
+    fig.canvas.set_window_title("Average graphs")
+    datestr = constants.get_date_str()
+    graphs_results_dir = constants.path_result_dir + datestr + constants.path_graphs_dir
+    out_dir_path = graphs_results_dir + constants.path_average_graphs_dir
+    if not os.path.exists(out_dir_path):
+        os.makedirs(out_dir_path)
+    card_chan_prod = card+ "_" + channel + "_" + product
+    out_file_name = out_dir_path + "average_graph_"+ card_chan_prod +"_" + datestr + ".png"
+    plt.savefig(out_file_name)
+    #plt.show()
+        
+        
+        
 
 def create_graphs_by_tags():
     chan_dict = {}
     for samp_type in sample.sorted_samples:
         for prod in sample.sorted_samples[samp_type]:
             for chan in sample.sorted_samples[samp_type][prod]:
+                if chan == constants.temp_col_name or chan == constants.humidity_col_name:
+                    continue                
                 if chan not in chan_dict.keys():
                     chan_dict[chan] = []
                 for ch_data in sample.sorted_samples[samp_type][prod][chan]:
@@ -84,6 +149,7 @@ def create_graphs_by_tags():
     for chan in chan_dict:
         similarity.group_by_similarity(chan_dict[chan])
         create_sim_plots(similarity.similarity_dict, chan)
+        create_mean_graphs(chan_dict[chan])
                 
 def create_sim_graphs(split_by):
     create_graph_directory()
@@ -146,8 +212,8 @@ def create_sim_plots(groups_dict, chan):
     card = ""
     channel  = ""
     group_statistics = "\n"
-    keys_list = [similarity.raw_data_key, similarity.first_derivate_key, similarity.second_derivate_key]
-    sub_plot_titles_pre_list = ["Sample relative data", "1st derivate", "2nd derivate"]
+    keys_list = [similarity.raw_data_key, similarity.first_derivative_key, similarity.second_derivative_key]
+    sub_plot_titles_pre_list = ["Sample relative data", "1st derivative", "2nd derivative"]
     xpositions = []
     subplot_index = 0
     open_sim_out_file(chan)
@@ -165,7 +231,8 @@ def create_sim_plots(groups_dict, chan):
                     xpositions = feature_extractor.calculate_prot_timing(ch_data.protocol)
                 add_graph_line(ax, ch_data, key)
                 add_row(key, group, ch_data)
-        ax[subplot_index].set_title(sub_plot_titles_pre_list[subplot_index] + group_statistics)
+        #ax[subplot_index].set_title(sub_plot_titles_pre_list[subplot_index] + group_statistics)
+        ax[subplot_index].set_title(sub_plot_titles_pre_list[subplot_index])
         subplot_index += 1
     close_sim_out_file()
     for i in range(3):
@@ -174,9 +241,11 @@ def create_sim_plots(groups_dict, chan):
         for xp in xpositions:
             ax[i].axvline(x=xp/10, color='r', linestyle='--')
         ax[i].axhline(y=0, color='green', linestyle='dotted')
-        ax[i].legend(loc='center left', bbox_to_anchor=(0, 1))
+    ax[0].legend(loc='upper left', bbox_to_anchor=(-0.2, 1.3)) 
+    ax[1].legend(loc='upper left', bbox_to_anchor=(0.8, 1.8)) 
+    ax[2].legend(loc='upper left', bbox_to_anchor=(0, 1.8)) 
     plt.subplots_adjust(hspace=0.3, left=0.18, bottom=1/figH, top=1-1/figH)
-    fig.suptitle("card: " + card + ", channel: " + channel + group_statistics, y=1)
+    fig.suptitle("card: " + card + ", channel: " + channel , y=1)
     plt.get_current_fig_manager().full_screen_toggle()  
     datestr = constants.get_date_str()
     graphs_results_dir = constants.path_result_dir + datestr + constants.path_graphs_dir    
@@ -208,9 +277,9 @@ def add_graph_line(ax, ch_data, key):
     Label = prod + ", " + tags
     if key == similarity.raw_data_key:
         ax[0].plot(time_array[0:509], ch_data.values[channel][0:509]*100, color = line_color, label=Label, marker=Marker, markersize=0.5)
-    elif key == similarity.first_derivate_key:
+    elif key == similarity.first_derivative_key:
         ax[1].plot(time_array[0:509], ch_data.derviate_1[0:509]*100, color = line_color, label=Label, marker=Marker, markersize=0.5)
-    elif key == similarity.second_derivate_key:
+    elif key == similarity.second_derivative_key:
         ax[2].plot(time_array[0:509], ch_data.derviate_2[0:509]*100, color = line_color, label=Label, marker=Marker, markersize=0.5)
         
 
