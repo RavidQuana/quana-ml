@@ -74,14 +74,14 @@ def add_features_row(ch_data):
         row.append(feat.slope_to_next_clear_pick)
     features_df.loc[len(features_df)] = row
 
-def flush_features_data_frame(filename):
+def flush_features_data_frame(filename, sorter):
     global features_df
     tagsCoulmnIndex = features_df.columns.get_loc(sample_file_parser.tags_col_name)
     for col in features_df.columns[(tagsCoulmnIndex+1):]:
         features_df[col] = sig.medfilt(features_df[col])    
     features_df.to_csv(filename)
     random_forest.runRandomForest(features_df)
-    graphs_creator.create_scatter_radar_graph(features_df)
+    graphs_creator.create_scatter_radar_graph(features_df, sorter)
     
 def get_max_slope(chan_data, start, end):
     return max(chan_data.derviate_1[start:end])

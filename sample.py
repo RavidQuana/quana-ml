@@ -27,7 +27,7 @@ class channel_data:
     def __init__(self):
         return
 
-def sort_samples(samples_array):
+def sort_samples(samples_array, sorter):
     prot = feature_extractor.protocol_attr()
     for sample in samples_array:
         if sample.sampler_type not in sorted_samples:
@@ -59,7 +59,7 @@ def sort_samples(samples_array):
     features_file_name = features_results_dir + "features_" + "_" + datestr + ".csv"    
     if not os.path.exists(features_results_dir):
         os.makedirs(features_results_dir)
-    feature_extractor.flush_features_data_frame(features_file_name)
+    feature_extractor.flush_features_data_frame(features_file_name, sorter)
 
     
             

@@ -20,7 +20,7 @@ def runRandomForest(dataframe):
     for channel in channels_list:
         for feature in dataframe.columns[(tagsCoulmnIndex+1):]:
             featureList.append(channel + "_" + feature)
-    randomForestDF = pd.DataFrame(columns=[sample_file_parser.tags_col_name] + featureList)
+    randomForestDF = pd.DataFrame(columns=[sample_file_parser.product_col_name] + [sample_file_parser.tags_col_name] + featureList)
     for product in dataframe[sample_file_parser.product_col_name].unique():
         rows_array = dataframe.loc[dataframe[sample_file_parser.product_col_name] == product]     
         out_rows = []
@@ -30,10 +30,10 @@ def runRandomForest(dataframe):
             for index, row in channel_rows.iterrows():
                 row_flat = row.values.tolist()
                 if len(out_rows) < (i + 1):
-                    out_rows.append(row_flat[3:])
+                    out_rows.append(row_flat[2:])
                 else:
                     if len(out_rows[i]) == 0:
-                        out_rows[i] += row_flat[3:]
+                        out_rows[i] += row_flat[2:]
                     else:
                         out_rows[i] += row_flat[4:]
                 i += 1
@@ -45,7 +45,8 @@ def runRandomForest(dataframe):
     
     x = randomForestDF[featureList]
     
-    y = randomForestDF[ sample_file_parser.tags_col_name]
+    #y = randomForestDF[ sample_file_parser.tags_col_name]
+    y = randomForestDF[ sample_file_parser.product_col_name]
     X_train, X_test, y_train, y_test = train_test_split(x, y, test_size=0.1)
     clf=RandomForestClassifier(n_estimators=1000)
     #Train the model using the training sets y_pred=clf.predict(X_test)

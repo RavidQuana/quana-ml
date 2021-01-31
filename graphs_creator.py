@@ -27,7 +27,11 @@ prod_tag_markers = {}
 color_name_index = 10
 graphs_results_dir = ""
 
-light_colors = ['cornsilk']
+light_colors = ['cornsilk', 'whitesmoke', 'blanchedalmond', 'bisque', 'beige', \
+            'azure', 'antiquewhite', 'aliceblue', 'lightgoldenrodyellow', 'lightcyan', \
+            'lemonchiffon', 'lavenderblush' , 'lavender', 'ivory', 'honeydew', \
+            'ghostwhite', 'gainsboro', 'florawhite', 'papayawhip', 'oldlace', 'navajowhite', \
+            'moccasin', 'mistyrose', 'mintcream', 'linen', 'lightyellow', 'white', 'snow', 'seashell']
 def create_graph_directory():
     datestr = constants.get_date_str()
     graphs_results_dir = constants.path_result_dir + datestr + constants.path_graphs_dir
@@ -66,23 +70,36 @@ def get_time_array():
     return time_array
 
 def create_graphs_by_prod():
+    chan_dict = {}
     for samp_type in sample.sorted_samples:
         for prod in sample.sorted_samples[samp_type]:
             for chan in sample.sorted_samples[samp_type][prod]:
                 if chan == constants.temp_col_name or chan == constants.humidity_col_name:
                     continue
-                similarity.group_by_similarity(sample.sorted_samples[samp_type][prod][chan])
-                create_sim_plots(similarity.similarity_dict, chan)
+                if chan not in chan_dict.keys():
+                    chan_dict[chan] = []
+                for ch_data in sample.sorted_samples[samp_type][prod][chan]:
+                    chan_dict[chan].append(ch_data)
+    for chan in chan_dict:
+        similarity.group_by_similarity(chan_dict[chan])
+        create_sim_plots(similarity.similarity_dict, chan)
+        create_mean_graphs(chan_dict[chan], sample_file_parser.product_col_name) 
 
-def create_mean_graphs(chan_array):
+def create_mean_graphs(chan_array, sorter):
     tags_dict = {}
     first_ch_data = chan_array[0]
     card = sample_file_parser.get_sample_card(first_ch_data.sample_id)
-    product = sample_file_parser.get_sample_prod(first_ch_data.sample_id)
+    if sorter == sample_file_parser.tags_col_name:
+        product = sample_file_parser.get_sample_prod(first_ch_data.sample_id)
     amount_of_samples = len(chan_array)
     channel = first_ch_data.values.columns[1]
     for ch_data in chan_array:
-        tags = sample_file_parser.get_sample_tag(ch_data.sample_id)
+        tagstr = sample_file_parser.get_sample_tag(ch_data.sample_id)
+        if sorter == sample_file_parser.product_col_name:
+            product = sample_file_parser.get_sample_prod(ch_data.sample_id)
+            tags = tagstr + "_" + product
+        else:
+            tags = tagstr
         if tags not in tags_dict:
             tags_dict[tags] = {}
             tags_dict[tags][similarity.raw_data_key] = []
@@ -119,7 +136,10 @@ def create_mean_graphs(chan_array):
     ax[1].set_title(similarity.first_derivative_key)
     ax[2].set_title(similarity.second_derivative_key)
     plt.subplots_adjust(hspace=0.3, left=0.18, bottom=1/figH, top=1-1/figH)
-    suptitle = "card: " + card + ", channel: " + channel + ", Product: " + product +"\n" + "amount of samples = " + str(amount_of_samples)
+    if sorter == sample_file_parser.tags_col_name:
+        suptitle = "card: " + card + ", channel: " + channel + ", Product: " + product +"\n" + "amount of samples = " + str(amount_of_samples)
+    else:
+        suptitle = "card: " + card + ", channel: " + channel +"\n" + "amount of samples = " + str(amount_of_samples)
     fig.suptitle(suptitle, y=1)   
     fig.canvas.set_window_title("Average graphs")
     datestr = constants.get_date_str()
@@ -127,7 +147,10 @@ def create_mean_graphs(chan_array):
     out_dir_path = graphs_results_dir + constants.path_average_graphs_dir
     if not os.path.exists(out_dir_path):
         os.makedirs(out_dir_path)
-    card_chan_prod = card+ "_" + channel + "_" + product
+    if sorter == sample_file_parser.tags_col_name:
+        card_chan_prod = card+ "_" + channel + "_" + product
+    else:
+        card_chan_prod = card+ "_" + channel 
     out_file_name = out_dir_path + "average_graph_"+ card_chan_prod +"_" + datestr + ".png"
     plt.savefig(out_file_name)
     #plt.show()
@@ -149,7 +172,7 @@ def create_graphs_by_tags():
     for chan in chan_dict:
         similarity.group_by_similarity(chan_dict[chan])
         create_sim_plots(similarity.similarity_dict, chan)
-        create_mean_graphs(chan_dict[chan])
+        create_mean_graphs(chan_dict[chan], sample_file_parser.tags_col_name)
                 
 def create_sim_graphs(split_by):
     create_graph_directory()
@@ -206,7 +229,7 @@ def create_sim_plots(groups_dict, chan):
     figW=18
     figH=10    
     fig, ax = plt.subplots(3, 1, figsize=(figW, figH))
-    color_name_index = 10
+    color_name_index = 0
     prod_tag_markers.clear()
     markers_list_index = 0
     card = ""
@@ -219,11 +242,12 @@ def create_sim_plots(groups_dict, chan):
     open_sim_out_file(chan)
     for key in keys_list:
         group_statistics = "\n"
+        color_name_index = 0
         for group in groups_dict[key]:
             add_group_data(groups_dict[key][group], key)
-            color_name_index += 2
-            if names[color_name_index] in light_colors:
-                color_name_index += 2
+            color_name_index += 1
+            while names[color_name_index] in light_colors:
+                color_name_index += 1
             Marker = ''
             group_statistics += group + " members->" + str(groups_dict[key][group].members_count) + "\n" 
             for ch_data in groups_dict[key][group].chan_data_array:
@@ -283,25 +307,27 @@ def add_graph_line(ax, ch_data, key):
         ax[2].plot(time_array[0:509], ch_data.derviate_2[0:509]*100, color = line_color, label=Label, marker=Marker, markersize=0.5)
         
 
-def create_scatter_chart(dataframe, feature):
+def create_scatter_chart(dataframe, feature, sorter):
     datestr = constants.get_date_str()
     graphs_results_dir = constants.path_result_dir + datestr + constants.path_graphs_dir    
     out_dir_path = graphs_results_dir + constants.path_scatered_graphs_dir
     if not os.path.exists(out_dir_path):
         os.makedirs(out_dir_path)    
-    figscatter = px.scatter(dataframe, x=constants.channel_out_col_title, y=feature, color=sample_file_parser.tags_col_name, height=1000, width=1600)
+    
+    figscatter = px.scatter(dataframe, x=constants.channel_out_col_title, y=feature, color=sorter, height=1000, width=1600)
     figscatter.update_layout(margin=dict(l=20, r=20, t=20, b=20))
     scatter_chart_file_name = out_dir_path + '\\' + feature + '_scatter_chart.png'
     figscatter.write_image(file=scatter_chart_file_name, format='png')    
 
-def create_radar_charts(dataframe, feature):
+def create_radar_charts(dataframe, feature, sorter):
     datestr = constants.get_date_str()
     graphs_results_dir = constants.path_result_dir + datestr + constants.path_graphs_dir    
     out_dir_path = graphs_results_dir + constants.path_radar_graphs_dir
     if not os.path.exists(out_dir_path):
         os.makedirs(out_dir_path)        
     #fig = go.Figure()
-    fig = px.scatter_polar(dataframe,  r=feature, theta=constants.channel_out_col_title, color=sample_file_parser.tags_col_name, height=1600, width=1800)
+    fig = px.scatter_polar(dataframe,  r=feature, theta=constants.channel_out_col_title, color=sorter, height=1600, width=1800)
+    
     #fig = px.line_polar(dataframe,  
                         #r=feature, 
                         #theta="QCM", 
@@ -339,11 +365,11 @@ def create_radar_charts(dataframe, feature):
     radar_chart_file_name = out_dir_path + '\\' + feature + '_radar_chart.png'
     fig.write_image(file=radar_chart_file_name, format='png')
         
-def create_scatter_radar_graph(dataframe):
+def create_scatter_radar_graph(dataframe, sorter):
     dataframe = dataframe.sort_values(by=[constants.channel_out_col_title, sample_file_parser.product_col_name])
     channels_list = dataframe[constants.channel_out_col_title].unique()
     tagsCoulmnIndex = dataframe.columns.get_loc(sample_file_parser.tags_col_name)
     featuresList = dataframe.columns[(tagsCoulmnIndex+1):]
     for feature in featuresList:
-        create_scatter_chart(dataframe, feature)
-        create_radar_charts(dataframe, feature)
+        create_scatter_chart(dataframe, feature, sorter)
+        create_radar_charts(dataframe, feature, sorter)

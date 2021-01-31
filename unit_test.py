@@ -7,6 +7,36 @@ import graphs_creator
 import sample_file_parser
 import os
 import constants
+
+#import matplotlib.pyplot as plt
+#import matplotlib.patches as patches
+#import matplotlib.colors as colors
+#import math
+
+
+#fig = plt.figure()
+#ax = fig.add_subplot(111)
+
+#ratio = 1.0 / 3.0
+#count = math.ceil(math.sqrt(len(colors.CSS4_COLORS)))
+#x_count = count * ratio
+#y_count = count / ratio
+#x = 0
+#y = 0
+#w = 1 / x_count
+#h = 1 / y_count
+
+#for c in colors.CSS4_COLORS:
+    #pos = (x / x_count, y / y_count)
+    #ax.add_patch(patches.Rectangle(pos, w, h, color=c))
+    #ax.annotate(c, xy=pos)
+    #if y >= y_count-1:
+        #x += 1
+        #y = 0
+    #else:
+        #y += 1
+
+#plt.show()
 zip_file_path = "C:/Users/ravid/Downloads/samples.zip"
 
 
@@ -17,9 +47,10 @@ Samples = sample_file_parser.extract_zip_file(zip_file_path)
         #if col != 'time':
             #samp.values[col] = signal_process.smooth(samp.values[col])
 
-sample.sort_samples(Samples)
+sample.sort_samples(Samples, sample_file_parser.product_col_name)
 
-graphs_creator.create_sim_graphs(graphs_creator.split_by_tag)
+graphs_creator.create_sim_graphs(graphs_creator.split_by_prod)
+#graphs_creator.create_sim_graphs(graphs_creator.split_by_tag)
 #print(sample.sorted_samples['prototype_1_aromabit']['Kanaf_Tilapia']['qcm_3'][0].values)
 #similarity.group_by_similarity(sample.sorted_samples['prototype_1_aromabit']['Kanaf_Tilapia']['qcm_3'])
 #for prod in sample.sorted_samples['prototype_1_aromabit']:

@@ -12,7 +12,7 @@ class group_stat:
         self.members_count = 1
         self.chan_data_array = []
         self.chan_data_array.append(ch_data)
-min_good_similarity = 0.65
+min_good_similarity = 0.85
 similarity_dict = {}
 group_prefix = "group_"
 group_raw_counter = 1
